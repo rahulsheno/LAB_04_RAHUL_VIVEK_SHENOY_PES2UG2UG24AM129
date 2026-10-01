@@ -10,26 +10,44 @@ WHITE = (255, 255, 255)
 GREEN = (0, 200, 0)
 RED = (220, 60, 60)
 
+# Difficulty presets: enemy march speed and per-enemy chance to fire each frame.
+# "Medium" matches the original game's enemy speed.
+DIFFICULTIES = {
+    "Easy":   {"key": pygame.K_1, "speed": 1.0, "fire_chance": 0.0003},
+    "Medium": {"key": pygame.K_2, "speed": 1.5, "fire_chance": 0.0006},
+    "Hard":   {"key": pygame.K_3, "speed": 2.5, "fire_chance": 0.0012},
+}
+DEFAULT_DIFFICULTY = "Medium"
+
+
 class GameEngine:
     def __init__(self, width, height):
         self.width = width
         self.height = height
 
-        self.player = Player(width // 2 - 20, height - 50, 40, 20)
-        self.enemy_grid = EnemyGrid(width)
+        self.font = pygame.font.SysFont("Arial", 30)
+        self.title_font = pygame.font.SysFont("Arial", 64, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 22)
+        self.quit_requested = False
+
+        self.reset(DEFAULT_DIFFICULTY)
+
+    def reset(self, difficulty):
+        """Start a fresh round at the given difficulty (a key of DIFFICULTIES)."""
+        settings = DIFFICULTIES[difficulty]
+        self.difficulty = difficulty
+
+        self.player = Player(self.width // 2 - 20, self.height - 50, 40, 20)
+        self.enemy_grid = EnemyGrid(self.width, speed=settings["speed"])
 
         self.player_bullets = []
         self.enemy_bullets = []
         self._shoot_cooldown = 0
-        self.enemy_fire_chance = 0.01
+        self.enemy_fire_chance = settings["fire_chance"]
 
         self.score = 0
-        self.font = pygame.font.SysFont("Arial", 30)
-        self.title_font = pygame.font.SysFont("Arial", 64, bold=True)
-        self.small_font = pygame.font.SysFont("Arial", 22)
         self.game_over = False
         self.won = False
-        self.quit_requested = False
 
     def handle_event(self, event):
         if self.game_over:
@@ -43,8 +61,15 @@ class GameEngine:
                 self._shoot_cooldown = 15
 
     def _handle_game_over_event(self, event):
-        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+        if event.type != pygame.KEYDOWN:
+            return
+        if event.key in (pygame.K_ESCAPE, pygame.K_q):
             self.quit_requested = True
+            return
+        for name, settings in DIFFICULTIES.items():
+            if event.key == settings["key"]:
+                self.reset(name)
+                return
 
     def handle_input(self):
         if self.game_over:
@@ -143,4 +168,8 @@ class GameEngine:
         title, color = ("YOU WIN!", GREEN) if self.won else ("GAME OVER", RED)
         self._draw_centered(screen, self.title_font, title, color, self.height // 2 - 70)
         self._draw_centered(screen, self.font, f"Final Score: {self.score}", WHITE, self.height // 2 + 5)
-        self._draw_centered(screen, self.small_font, "Press ENTER or ESC to exit", WHITE, self.height // 2 + 70)
+        self._draw_centered(screen, self.small_font, "Play again - choose difficulty:", WHITE, self.height // 2 + 65)
+        for i, (name, settings) in enumerate(DIFFICULTIES.items()):
+            label = f"[{i + 1}] {name}" + ("  (last played)" if name == self.difficulty else "")
+            self._draw_centered(screen, self.small_font, label, GREEN, self.height // 2 + 100 + i * 30)
+        self._draw_centered(screen, self.small_font, "[Q] or [ESC] to exit", RED, self.height // 2 + 100 + len(DIFFICULTIES) * 30 + 10)
