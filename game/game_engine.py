@@ -63,26 +63,38 @@ class GameEngine:
         self.player_bullets = [b for b in self.player_bullets if not b.off_screen(self.height)]
         self.enemy_bullets = [b for b in self.enemy_bullets if not b.off_screen(self.height)]
 
-        # NOTE: this removes a bullet from player_bullets while iterating
-        # directly over that same list. Python skips the element right
-        # after a removed one, so when two enemies are hit on the same
-        # frame the second collision can be missed - the bullet appears
-        # to pass straight through. See Task 1 in the README.
-        for bullet in self.player_bullets:
-            for enemy in self.enemy_grid.alive_enemies():
-                if bullet.rect().colliderect(enemy.rect()):
-                    enemy.alive = False
-                    self.player_bullets.remove(bullet)
-                    self.score += 1
-                    break
+        self._resolve_player_bullet_hits()
 
         for bullet in self.enemy_bullets:
-            if bullet.rect().colliderect(self.player.rect()):
+            if bullet.swept_rect().colliderect(self.player.rect()):
                 self.game_over = True
                 break
 
         if self.enemy_grid.reached_bottom(self.player.y):
             self.game_over = True
+
+    def _resolve_player_bullet_hits(self):
+        """Each bullet destroys at most one enemy, each enemy dies at most once.
+
+        Surviving bullets are collected into a new list instead of calling
+        list.remove() while iterating, which used to skip the bullet after
+        every removed one.
+        """
+        targets = self.enemy_grid.alive_enemies()
+        surviving = []
+        for bullet in self.player_bullets:
+            bullet_rect = bullet.swept_rect()
+            hit = None
+            for enemy in targets:
+                if enemy.alive and bullet_rect.colliderect(enemy.rect()):
+                    hit = enemy
+                    break
+            if hit is None:
+                surviving.append(bullet)
+            else:
+                hit.alive = False
+                self.score += 1
+        self.player_bullets = surviving
 
     def render(self, screen):
         pygame.draw.rect(screen, GREEN, self.player.rect())

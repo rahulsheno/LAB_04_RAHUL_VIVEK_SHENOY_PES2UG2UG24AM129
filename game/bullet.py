@@ -8,8 +8,10 @@ class Bullet:
         self.height = height
         self.speed = speed
         self.direction = direction  # -1 = moving up (player bullet), 1 = moving down (enemy bullet)
+        self.prev_y = y
 
     def move(self):
+        self.prev_y = self.y
         self.y += self.speed * self.direction
 
     def off_screen(self, screen_height):
@@ -17,3 +19,10 @@ class Bullet:
 
     def rect(self):
         return pygame.Rect(self.x, self.y, self.width, self.height)
+
+    def swept_rect(self):
+        """Rect covering everything the bullet passed through this frame,
+        so a fast bullet can't skip over a target between two frames."""
+        top = min(self.prev_y, self.y)
+        height = abs(self.y - self.prev_y) + self.height
+        return pygame.Rect(self.x, top, self.width, height)
