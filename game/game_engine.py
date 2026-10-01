@@ -25,16 +25,30 @@ class GameEngine:
 
         self.score = 0
         self.font = pygame.font.SysFont("Arial", 30)
+        self.title_font = pygame.font.SysFont("Arial", 64, bold=True)
+        self.small_font = pygame.font.SysFont("Arial", 22)
         self.game_over = False
+        self.won = False
+        self.quit_requested = False
 
     def handle_event(self, event):
+        if self.game_over:
+            self._handle_game_over_event(event)
+            return
+
         if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
             if self._shoot_cooldown <= 0:
                 bullet_x = self.player.center_x() - 2
                 self.player_bullets.append(Bullet(bullet_x, self.player.y, direction=-1))
                 self._shoot_cooldown = 15
 
+    def _handle_game_over_event(self, event):
+        if event.type == pygame.KEYDOWN and event.key in (pygame.K_RETURN, pygame.K_ESCAPE):
+            self.quit_requested = True
+
     def handle_input(self):
+        if self.game_over:
+            return
         keys = pygame.key.get_pressed()
         if keys[pygame.K_LEFT] or keys[pygame.K_a]:
             self.player.move(-self.player.speed, self.width)
@@ -73,6 +87,10 @@ class GameEngine:
         if self.enemy_grid.reached_bottom(self.player.y):
             self.game_over = True
 
+        if not self.enemy_grid.alive_enemies():
+            self.game_over = True
+            self.won = True
+
     def _resolve_player_bullet_hits(self):
         """Each bullet destroys at most one enemy, each enemy dies at most once.
 
@@ -110,7 +128,19 @@ class GameEngine:
         score_text = self.font.render(f"Score: {self.score}", True, WHITE)
         screen.blit(score_text, (10, 10))
 
-        if self.game_over and not getattr(self, "_game_over_logged", False):
-            # NOTE: no proper game-over screen yet - see Task 2 in the README.
-            print("Game over! Final score:", self.score)
-            self._game_over_logged = True
+        if self.game_over:
+            self._render_game_over(screen)
+
+    def _draw_centered(self, screen, font, text, color, y):
+        surf = font.render(text, True, color)
+        screen.blit(surf, surf.get_rect(center=(self.width // 2, y)))
+
+    def _render_game_over(self, screen):
+        overlay = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 180))
+        screen.blit(overlay, (0, 0))
+
+        title, color = ("YOU WIN!", GREEN) if self.won else ("GAME OVER", RED)
+        self._draw_centered(screen, self.title_font, title, color, self.height // 2 - 70)
+        self._draw_centered(screen, self.font, f"Final Score: {self.score}", WHITE, self.height // 2 + 5)
+        self._draw_centered(screen, self.small_font, "Press ENTER or ESC to exit", WHITE, self.height // 2 + 70)
