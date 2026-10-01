@@ -3,6 +3,7 @@ import random
 from .player import Player
 from .enemy import EnemyGrid
 from .bullet import Bullet
+from .sound import SoundManager
 
 # Game Engine
 
@@ -29,6 +30,7 @@ class GameEngine:
         self.title_font = pygame.font.SysFont("Arial", 64, bold=True)
         self.small_font = pygame.font.SysFont("Arial", 22)
         self.quit_requested = False
+        self.sound = SoundManager()
 
         self.reset(DEFAULT_DIFFICULTY)
 
@@ -59,6 +61,7 @@ class GameEngine:
                 bullet_x = self.player.center_x() - 2
                 self.player_bullets.append(Bullet(bullet_x, self.player.y, direction=-1))
                 self._shoot_cooldown = 15
+                self.sound.play("shoot")
 
     def _handle_game_over_event(self, event):
         if event.type != pygame.KEYDOWN:
@@ -106,15 +109,22 @@ class GameEngine:
 
         for bullet in self.enemy_bullets:
             if bullet.swept_rect().colliderect(self.player.rect()):
-                self.game_over = True
+                self._end_game(won=False)
                 break
 
-        if self.enemy_grid.reached_bottom(self.player.y):
-            self.game_over = True
+        if not self.game_over and self.enemy_grid.reached_bottom(self.player.y):
+            self._end_game(won=False)
 
-        if not self.enemy_grid.alive_enemies():
-            self.game_over = True
-            self.won = True
+        if not self.game_over and not self.enemy_grid.alive_enemies():
+            self._end_game(won=True)
+
+    def _end_game(self, won):
+        if self.game_over:
+            return
+        self.game_over = True
+        self.won = won
+        if not won:
+            self.sound.play("game_over")
 
     def _resolve_player_bullet_hits(self):
         """Each bullet destroys at most one enemy, each enemy dies at most once.
@@ -137,6 +147,7 @@ class GameEngine:
             else:
                 hit.alive = False
                 self.score += 1
+                self.sound.play("explosion")
         self.player_bullets = surviving
 
     def render(self, screen):
